@@ -1,0 +1,505 @@
+---
+title: "Environmental & species data"
+subtitle: "Climate, soil, landscape, taxonomy, phylogeny & functional"
+author: "Sylvain Schmitt"
+institute: CIRAD
+date: today
+date-format: medium
+format: 
+  revealjs:
+    theme: dark
+    output-location: fragment
+    slide-number: true
+    logo: figures/logo.png
+    transition: fade
+    preview-links: true
+    chalkboard: true
+bibliography: references.bib
+include-in-header:
+  - text: |
+      <style>
+      .reveal .slide-logo {
+        max-height: unset;
+        height: 75px;
+      }
+      </style>
+---
+
+```{r set}
+#| message: false
+#| include: false
+library(tidyverse)
+library(sf)
+library(leaflet)
+library(units)
+library(ggdark)
+library(ggfortify)
+```
+
+# Environment
+
+**environment** is a sub-project of the [**BioForest**](https://github.com/Bioforest-project) project aimed at gathering environmental variables of climate ([TerraClimate](https://www.climatologylab.org/terraclimate.html)), soil ([SoilGrids](https://www.isric.org/explore/soilgrids)) and landscape ([TMF](https://forobs.jrc.ec.europa.eu/TMF)) for data preparation within the project.
+
+## Sites
+
+```{r map}
+#| message: false
+#| warning: false
+#| fig-cap: "Sites and plots locations."
+read_tsv("../environment/data/derived_data/sites.tsv") %>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>%
+  leaflet() %>%
+  addTiles() %>%
+  addProviderTiles("Esri.WorldImagery", group = "ESRI") %>%
+  addMarkers(
+    label = ~ paste(site, plot),
+    labelOptions = labelOptions(noHide = FALSE)
+  )
+```
+
+## Surface
+
+```{r sitesarea}
+#| message: false
+#| warning: false
+#| fig-cap: "Number of sites and total plots surface."
+read_tsv("../environment/data/derived_data/sites.tsv") %>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>%
+  group_by(site) %>%
+  summarise(n = n()) %>%
+  st_convex_hull() %>%
+  mutate(area = as.numeric(set_units(st_area(.), "km^2"))) %>%
+  st_drop_geometry() %>%
+  ggplot(aes(n, area)) +
+  geom_point() +
+  xlab("Number of plots") +
+  ylab(expression(paste("Area [", km^2, "]"))) +
+  ggrepel::geom_text_repel(aes(label = site), color = "white") +
+  dark_theme_gray() +
+  theme(plot.background = element_rect(fill = "grey10", color = NA)) +
+  scale_y_sqrt()
+```
+
+# Climate
+
+[TerraClimate](https://www.climatologylab.org/terraclimate.html) is a dataset of **monthly** & **\~4-km (1/24th degree**)climate and climatic **water balance** for global terrestrial surfaces from **1958-2019** [@abatzoglou2018]. We have information per depth in each plot as shown below, but I focuses on the top horizon (up to 5cm).
+
+## Monthly variables
+
+-   ET: Actual evapotranspiration, mm
+-   CWD: Climate water deficit, mm
+-   Tmax: Maximum temperature, °C
+-   Tmin: Minimum temperature, °C
+-   PDSI: Palmer Drought Severity Index
+-   PET: Potential evapotranpiration, mm
+-   Pr: precipitation, mm
+-   Soil: Soil humidity, mm
+-   VPD: Vapour Pressure Deficit, kPa
+
+## Ombrothermal
+
+```{r umbrothermal}
+#| message: false
+#| warning: false
+#| fig-cap: "Umbrothermal diagrams for the mean climate of each site."
+read_tsv("../environment/data/derived_data/climate_month.tsv") %>%
+  filter(site != "Uppangala") %>%
+  group_by(site, month) %>%
+  summarise_all(mean) %>%
+  ggplot(aes(x = month)) +
+  geom_col(aes(y = pr / 10, fill = pr < 100), col = NA) +
+  geom_line(aes(y = tmmn, col = "maximum"), linewidth = 1.1) +
+  geom_line(aes(y = tmmx, col = "minimum"), linewidth = 1.1) +
+  xlab("") +
+  scale_x_continuous(
+    breaks = 1:12,
+    labels = c("J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D")
+  ) +
+  scale_y_continuous(
+    name = "Temperature (°C)",
+    sec.axis = sec_axis(trans = ~ . * 10, name = "Precipitation (mm)")
+  ) +
+  scale_color_discrete(guide = "none") +
+  facet_wrap(~site) +
+  scale_fill_manual(guide = "none", values = c("darkgrey", "white")) +
+  dark_theme_gray() +
+  theme(plot.background = element_rect(fill = "grey10", color = NA))
+```
+
+## Ombrothermal Uppangala
+
+```{r umbrothermal_uppangala}
+#| message: false
+#| warning: false
+#| fig-cap: "Umbrothermal diagrams for the mean climate of Uppangala."
+read_tsv("../environment/data/derived_data/climate_month.tsv") %>%
+  filter(site == "Uppangala") %>%
+  group_by(site, month) %>%
+  summarise_all(mean) %>%
+  ggplot(aes(x = month)) +
+  geom_col(aes(y = pr / 10, fill = pr < 100), col = NA) +
+  geom_line(aes(y = tmmn, col = "maximum"), linewidth = 1.1) +
+  geom_line(aes(y = tmmx, col = "minimum"), linewidth = 1.1) +
+  xlab("") +
+  scale_x_continuous(
+    breaks = 1:12,
+    labels = c("J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D")
+  ) +
+  scale_y_continuous(
+    name = "Temperature (°C)",
+    sec.axis = sec_axis(trans = ~ . * 10, name = "Precipitation (mm)")
+  ) +
+  scale_color_discrete(guide = "none") +
+  facet_wrap(~site) +
+  scale_fill_manual(guide = "none", values = c("darkgrey", "white")) +
+  dark_theme_gray() +
+  theme(plot.background = element_rect(fill = "grey10", color = NA))
+```
+
+## Yearly metrics {.smaller}
+
+-   CWD: Climate water deficit, mm, mean across years of the sum of monthly CWD
+-   ET: Evapotranspiration, mm, mean across years of the sum of monthly ET
+-   Pr: Precipitation, mm, mean across years of the sum of monthly Pr
+-   Soil: Soil humidity, mm, mean across years of the minimum of monthly soil humidity
+-   VPD: Vapour Pressure Deficit, kPa, mean across years of the maximum of monthly VPD
+-   Tmax: Maximum temperature, °C, mean across years of the maximum of monthly Tmax
+-   DSL: Dry season length, days, mean across years of the number of month with ET\>Pr multiplied by 30
+-   DSI: Dry season intensity, mm, mean across years of the sum of ET-Pr for month with ET\>Pr
+
+## Metrics
+
+```{r metricssoil}
+#| message: false
+#| warning: false
+#| fig-cap: "Yearly mean climate variables per site."
+read_tsv("../environment/data/derived_data/climate_year.tsv") %>%
+  gather(variable, value, -site, -plot) %>%
+  mutate(var_long = recode(variable,
+    "et" = "Evapotranspiration [ mm ]",
+    "cwd" = "Climate water deficit [ mm ]",
+    "pr" = "Precipitation [ mm ]",
+    "tmax" = "Max temperature [ °C ]",
+    "vpd" = "Max VPD [ kPA ]",
+    "soil" = "Min soil humidity [ mm ]",
+    "dsi" = "Dry season intensity [ mm ]",
+    "dsl" = "Dry season length [ day ]"
+  )) %>%
+  ggplot(aes(site, value, fill = site, group = paste(site, plot))) +
+  geom_col(position = "dodge") +
+  facet_wrap(~var_long, scales = "free_y") +
+  dark_theme_gray() +
+  theme(
+    legend.position = "right", axis.title = element_blank(),
+    axis.text.x = element_blank(),
+    legend.background = element_rect(fill = "grey10", color = NA),
+    plot.background = element_rect(fill = "grey10", color = NA)
+  ) +
+  scale_fill_discrete("")
+```
+
+## Co-variations
+
+```{r pcasoil}
+#| message: false
+#| warning: false
+#| fig-cap: "Yearly mean climate variables PCA per site and plot."
+data <- read_tsv("../environment/data/derived_data/climate_year.tsv")
+pca <- prcomp(data %>% select(-site, -plot), scale. = TRUE)
+autoplot(pca,
+  loadings = TRUE, loadings.label = TRUE,
+  loadings.label.repel = TRUE,
+  data = data, colour = "site"
+) +
+  scale_color_discrete("") +
+  dark_theme_gray() +
+  theme(
+    plot.background = element_rect(fill = "grey10", color = NA),
+    legend.background = element_rect(fill = "grey10", color = NA)
+  )
+```
+
+## Correlations
+
+```{r corrsoil}
+#| message: false
+#| warning: false
+#| fig-cap: "Climate variables pairwise correlations."
+par(bg = "grey10")
+read_tsv("../environment/data/derived_data/climate_year.tsv") %>%
+  select(-site, -plot) %>%
+  cor(use = "pairwise.complete.obs") %>%
+  corrplot::corrplot(
+    type = "upper", diag = FALSE,
+    bg = "grey10", tl.col = "white"
+  )
+```
+
+# Soil
+
+[SoilGrids](https://www.isric.org/explore/soilgrids) are global **soil property** maps at **six standard depth** intervals (according to the GlobalSoilMap IUSS working group and its specifications) at a spatial resolution of **250 meters** [@poggio2021]. I focused on the **two top horizons (0-15cm)** revealing most inter-site variations (V. Freycon pers. com.).
+
+## Variables {.smaller}
+
+-   Clay: Proportion of clay particles (\< 0.002 mm) in the fine earth fraction, %
+-   Sand: Proportion of sand particles (\> 0.05 mm) in the fine earth fraction, %
+-   Silt: Proportion of silt particles (≥ 0.002 mm and ≤ 0.05 mm) in the fine earth fraction, %
+-   BD: Bulk density of the fine earth fraction, kg dm³
+-   CEC: Cation Exchange Capacity of the soil, cmolC kg^-1^
+-   CF: Volumetric fraction of coarse fragments (\> 2 mm), cm^3^ 100cm^-3^
+-   N: Total nitrogen, g kg^-1^
+-   pH: Soil pH
+-   SOC: Soil organic carbon content in the fine earth fraction, g kg^-1^
+-   OCD: Organic carbon density, kg dm³
+-   OCS: Organic carbon stocks, kg m^2^
+
+## Paracou
+
+```{r par_soil}
+#| message: false
+#| warning: false
+#| fig-cap: "Soil data variation with depth at Paracou across plots."
+read_tsv("../environment/data/derived_data/soil.tsv") %>%
+  filter(site == "Paracou") %>%
+  select(-X, -Y, -site, -ocs) %>%
+  gather(variable, value, -plot, -depth) %>%
+  mutate(var_long = recode(variable,
+    "bdod" = '"BD ["~kg~dm^{-3}~"]"',
+    "cec" = '"CEC ["~cmol~kg^{-1}~"]"',
+    "cfvo" = '"CF ["~cm^3~"100"~cm^{-3}~"]"',
+    "clay" = '"Clay ["~"%"~"]"',
+    "nitrogen" = '"N ["~g~kg^{-1}~"]"',
+    "ocd" = '"OCD ["~kg~dm^{3}~"]"',
+    "phh2o" = "pH",
+    "sand" = '"Sand ["~"%"~"]"',
+    "silt" = '"Silt ["~"%"~"]"',
+    "soc" = '"SOC ["~g~kg^{-1}~"]"'
+  )) %>%
+  ggplot(aes(depth, value, group = as.character(plot))) +
+  geom_line() +
+  facet_wrap(~var_long, scales = "free_y", labeller = label_parsed) +
+  ylab("") +
+  xlab("Depth [ m ]") +
+  scale_x_log10() +
+  ggtitle("Paracou") +
+  dark_theme_gray() +
+  theme(
+    plot.background = element_rect(fill = "grey10", color = NA),
+    legend.background = element_rect(fill = "grey10", color = NA)
+  )
+```
+
+## All
+
+```{r allplot5}
+#| message: false
+#| warning: false
+#| fig-cap: "Mean soil data per site for top horizon (up to 5cm)."
+read_tsv("../environment/data/derived_data/soil.tsv") %>%
+  select(-X, -Y, -plot) %>%
+  group_by(site) %>%
+  filter(depth <= 15) %>%
+  summarise_all(mean, na.omit = TRUE) %>%
+  gather(variable, value, -site, -depth) %>%
+  na.omit() %>%
+  mutate(var_long = recode(variable,
+    "bdod" = '"BD ["~kg~dm^{-3}~"]"',
+    "cec" = '"CEC ["~cmol~kg^{-1}~"]"',
+    "cfvo" = '"CF ["~cm^3~"100"~cm^{-3}~"]"',
+    "clay" = '"Clay ["~"%"~"]"',
+    "nitrogen" = '"N ["~g~kg^{-1}~"]"',
+    "ocd" = '"OCD ["~kg~dm^{3}~"]"',
+    "ocs" = '"OCS ["~kg~m^{-2}~"]"',
+    "phh2o" = "pH",
+    "sand" = '"Sand ["~"%"~"]"',
+    "silt" = '"Silt ["~"%"~"]"',
+    "soc" = '"SOC ["~g~kg^{-1}~"]"'
+  )) %>%
+  ggplot(aes(site, value, fill = site)) +
+  geom_col(aes(group = as.factor(depth)), position = "dodge") +
+  facet_wrap(~var_long, scales = "free_y", labeller = label_parsed) +
+  scale_fill_discrete("") +
+  dark_theme_gray() +
+  theme(
+    plot.background = element_rect(fill = "grey10", color = NA),
+    legend.background = element_rect(fill = "grey10", color = NA)
+  ) +
+  theme(
+    legend.position = "bottom", axis.title = element_blank(),
+    axis.text.x = element_blank()
+  )
+```
+
+## Textures
+
+```{r betterplot}
+#| message: false
+#| warning: false
+#| fig-cap: "Soil texture for all sites, plots and depths."
+par(bg = "grey10")
+read_tsv("../environment/data/derived_data/soil.tsv") %>%
+  ggplot(aes(x = sand, y = clay, z = silt, col = site)) +
+  ggtern::coord_tern(L = "x", T = "y", R = "z") +
+  geom_point() +
+  labs(
+    yarrow = "Clay [ % ]",
+    zarrow = "Silt [ % ]",
+    xarrow = "Sand [ % ]"
+  ) +
+  ggtern::theme_showarrows() +
+  ggtern::theme_hidetitles() +
+  ggtern::theme_clockwise() +
+  scale_color_discrete("") +
+  dark_theme_gray() +
+  theme(
+    plot.background = element_rect(fill = "grey10", color = NA),
+    legend.background = element_rect(fill = "grey10", color = NA)
+  )
+```
+
+## Co-variations
+
+```{r pca}
+#| message: false
+#| warning: false
+#| fig-cap: "Soil variables PCA per site and plot."
+data <- read_tsv("../environment/data/derived_data/soil.tsv") %>%
+  select(-X, -Y, -plot) %>%
+  group_by(site) %>%
+  filter(depth <= 15) %>%
+  summarise_all(mean, na.omit = TRUE) %>%
+  select(-ocs) %>%
+  na.omit()
+pca <- prcomp(data %>% select(-site, -depth), scale. = TRUE)
+autoplot(pca,
+  loadings = TRUE, loadings.label = TRUE,
+  loadings.label.repel = TRUE,
+  data = data, colour = "site"
+) +
+  scale_color_discrete("") +
+  dark_theme_gray() +
+  theme(
+    plot.background = element_rect(fill = "grey10", color = NA),
+    legend.background = element_rect(fill = "grey10", color = NA)
+  )
+```
+
+## Correlations
+
+```{r corr}
+#| message: false
+#| warning: false
+#| fig-cap: "Soil variables pairwise correlations."
+par(bg = "grey10")
+read_tsv("../environment/data/derived_data/soil.tsv") %>%
+  select(-X, -Y, -plot) %>%
+  group_by(site) %>%
+  filter(depth <= 15) %>%
+  summarise_all(mean, na.omit = TRUE) %>%
+  select(-ocs) %>%
+  na.omit() %>%
+  select(-site, -depth) %>%
+  cor(use = "pairwise.complete.obs") %>%
+  corrplot::corrplot(
+    type = "upper", diag = FALSE,
+    bg = "grey10", tl.col = "white"
+  )
+```
+
+# Landscape
+
+The European Commission’s Joint Research Centre developed a dataset on **forest cover change** in tropical moist forests [TMF](https://forobs.jrc.ec.europa.eu/TMF) using 42 years of Landsat time series at 0.09 ha resolution (**30m**) depicting disturbances (deforestation and degradation), and post-deforestation recovery (or forest regrowth) over the period 1990-2023 [@europeancommission.jointresearchcentre.2020].
+
+## Trajectories
+
+```{r allsites}
+#| message: false
+#| warning: false
+#| fig-cap: "Forest cover through time."
+read_tsv("../environment/data/derived_data/landscape.tsv") %>%
+  na.omit() %>%
+  ggplot(aes(year, 100 - intact, col = site, group = paste(site, plot))) +
+  geom_line() +
+  xlab("") +
+  ylab("Deforested area in a radius of 1-km [ % ]") +
+  facet_wrap(~site) +
+  scale_color_discrete(guide = "none") +
+  scale_y_sqrt() +
+  dark_theme_gray() +
+  theme(
+    plot.background = element_rect(fill = "grey10", color = NA),
+    legend.background = element_rect(fill = "grey10", color = NA)
+  )
+```
+
+## Deforested
+
+```{r deforested}
+#| message: false
+#| warning: false
+#| fig-cap: "Deforested area in a radius of 1-km, %."
+read_tsv("../environment/data/derived_data/landscape.tsv") %>%
+  group_by(site, plot) %>%
+  summarise(deforested = mean(100 - intact)) %>%
+  ggplot(aes(site, deforested, fill = site, group = paste(site, plot))) +
+  geom_col(position = "dodge") +
+  xlab("") +
+  ylab("Deforested area in a radius of 1-km [ % ]") +
+  scale_fill_discrete(" ") +
+  coord_flip() +
+  scale_y_sqrt() +
+  dark_theme_gray() +
+  theme(
+    plot.background = element_rect(fill = "grey10", color = NA),
+    legend.background = element_rect(fill = "grey10", color = NA)
+  )
+```
+
+# All environment
+
+## Co-variations
+
+```{r pcaall}
+#| message: false
+#| warning: false
+#| fig-cap: "All variables PCA per site and plot."
+data <- read_tsv("../environment/outputs/environment.tsv") %>%
+  na.omit()
+pca <- prcomp(data %>% select(-site, -plot, -longitude, -latitude),
+  scale. = TRUE
+)
+autoplot(pca,
+  loadings = TRUE, loadings.label = TRUE,
+  loadings.label.repel = TRUE,
+  data = data, colour = "site"
+) +
+  scale_color_discrete("") +
+  dark_theme_gray() +
+  theme(
+    plot.background = element_rect(fill = "grey10", color = NA),
+    legend.background = element_rect(fill = "grey10", color = NA)
+  )
+```
+
+## Correlations
+
+```{r corrall}
+#| message: false
+#| warning: false
+#| fig-cap: "All variables pairwise correlations."
+par(bg = "grey10")
+read_tsv("../environment/outputs/environment.tsv") %>%
+  select(-site, -plot, -longitude, -latitude) %>%
+  cor(use = "pairwise.complete.obs") %>%
+  corrplot::corrplot(
+    type = "upper", diag = FALSE,
+    bg = "grey10", tl.col = "white"
+  )
+```
+
+# Species
+
+# References
+
+::: {#refs}
+:::
