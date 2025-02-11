@@ -34,6 +34,10 @@ library(leaflet)
 library(units)
 library(ggdark)
 library(ggfortify)
+library(knitr)
+library(ape)
+library(phylobase)
+library(ggtree)
 ```
 
 # Environment
@@ -457,6 +461,8 @@ read_tsv("../environment/data/derived_data/landscape.tsv") %>%
 
 # All environment
 
+Climate, soil and landscape data gathered.
+
 ## Co-variations
 
 ```{r pcaall}
@@ -498,6 +504,349 @@ read_tsv("../environment/outputs/environment.tsv") %>%
 ```
 
 # Species
+
+**species** is a sub-project of the [**BioForest**](https://github.com/Bioforest-project) project aimed at species related data (correct names, functional traits, phylogeny) as part of the data preparation for data preparation within the project.
+
+# Raw
+
+Raw data taxonomic information based on family, genus, species, scientific names and vernacular names and manual cleaning of raw mistakes.
+
+## Site
+
+::: {style="font-size: 50%;"}
+```{r stats}
+#| message: false
+#| warning: false
+read_tsv("../species/data/derived_data/raw_taxo_preped_v2.tsv") %>%
+  group_by(site) %>%
+  summarise(
+    family = length(unique(na.omit(family))),
+    genus = length(unique(na.omit(genus))),
+    species = length(unique(paste(genus, species))),
+    scientific = length(unique(na.omit(scientific))),
+    vernacular = length(unique(na.omit(vernacular)))
+  ) %>%
+  kable()
+```
+:::
+
+## All
+
+```{r totals}
+#| message: false
+#| warning: false
+read_tsv("../species/data/derived_data/raw_taxo_preped_v2.tsv") %>%
+  summarise(
+    family = length(unique(na.omit(family))),
+    genus = length(unique(na.omit(genus))),
+    species = length(unique(paste(genus, species))),
+    scientific = length(unique(na.omit(scientific))),
+    vernacular = length(unique(na.omit(vernacular)))
+  ) %>%
+  kable(
+    format.args = list(big.mark = ","),
+    caption = "Total numbers per taxonomic levels."
+  )
+```
+
+## Scientific
+
+```{r diffs}
+#| warning: false
+#| message: false
+#| fig-cap: Scientific names per genus species pairs.
+read_tsv("../species/data/derived_data/raw_taxo_preped_v2.tsv") %>%
+  mutate(species = paste(genus, species)) %>%
+  select(species, scientific) %>%
+  unique() %>%
+  group_by(species) %>%
+  summarise(N = n()) %>%
+  filter(N > 1) %>%
+  ggplot(aes(N)) +
+  geom_histogram() +
+  theme_bw() +
+  scale_y_sqrt() +
+  scale_x_sqrt() +
+  xlab("Scientific names per genus species pairs") +
+  ylab("") +
+  dark_theme_gray() +
+  theme(
+    plot.background = element_rect(fill = "grey10", color = NA),
+    legend.background = element_rect(fill = "grey10", color = NA)
+  )
+```
+
+## Manual {.smaller}
+
+```{r namecortab}
+#| message: false
+#| warning: false
+read_tsv("../species/data/derived_data/corrected_taxo_v2.tsv") %>%
+  select(family_reason, genus_reason, species_reason) %>%
+  gather("level", "reason") %>%
+  na.omit() %>%
+  group_by(level, reason) %>%
+  summarise(corrections = n()) %>%
+  kable(
+    format.args = list(big.mark = ","),
+    caption = "Number of corrections per level and reason."
+  )
+```
+
+# Cleaning
+
+Automatic cleaning, synonymy and updating of taxonomy with [World Flora Online](https://www.worldfloraonline.org/).
+
+## Match {.smaller}
+
+```{r matches}
+#| message: false
+#| warning: false
+read_tsv("../species/data/derived_data/wfo_out_v2.tsv") %>%
+  group_by(spec.name) %>%
+  summarise(matched = all(Matched)) %>%
+  group_by(matched) %>%
+  summarise(N = n(), names = ifelse(!matched, paste(spec.name), "")) %>%
+  unique() %>%
+  kable(
+    format.args = list(big.mark = ","),
+    caption = "Number of matched and unmatched species."
+  )
+```
+
+## Non match
+
+::: {style="font-size: 50%;"}
+```{r manual_curration}
+manual_curration <- data.frame(
+  scientific_corrected = c(
+    "Alseodaphne ceratoxylon",
+    "Alseodaphne havilandii",
+    "Balanites wilsoniana",
+    "Brosimum obovata",
+    "Chrysophyllum pachycarpa",
+    "Fernandoa adolfi",
+    "Handroanthus campestris",
+    "Palaquium cochlariflorum"
+  ),
+  family_cleaned = c(
+    "Lauraceae",
+    "Lauraceae",
+    "Moraceae",
+    "Zygophyllaceae",
+    "Sapotaceae",
+    "Bignoniaceae",
+    "Bignoniaceae",
+    "Sapotaceae"
+  ),
+  genus_cleaned = c(
+    "Alseodaphne",
+    "Alseodaphne",
+    "Brosimum",
+    "Balanites",
+    "Chrysophyllum",
+    "Fernandoa",
+    "Handroanthus",
+    "Palaquium"
+  ),
+  species_cleaned = c(
+    NA,
+    NA,
+    "acutifolium",
+    "obovata",
+    "lucentifolium",
+    "adolfi-friderici",
+    NA,
+    "cochleariifolium"
+  ),
+  cleaning_type = "manual curration",
+  cleaning_comment = c(
+    "unknown species on wfo",
+    "unknown species on wfo",
+    "Brosimum acutifolium subsp.",
+    "missing family in wfo subset",
+    "Chrysophyllum lucentifolium subsp. pachycarpum",
+    "issue with the - in species name",
+    "unknown species on wfo",
+    "very misspelled"
+  )
+)
+kable(manual_curration)
+```
+:::
+
+## Fuzzy match
+
+```{r fuzzy_unique}
+#| message: false
+#| warning: false
+read_tsv("../species/data/derived_data/wfo_out_v2.tsv") %>%
+  filter(Matched) %>%
+  group_by(spec.name) %>%
+  summarise(fuzzy = all(Fuzzy), unique = all(Unique)) %>%
+  group_by(fuzzy, unique) %>%
+  summarise(N = n()) %>%
+  mutate(
+    fuzzy = ifelse(fuzzy, "fuzzy", "exact"),
+    unique = ifelse(unique, "unique", "multiple")
+  ) %>%
+  pivot_wider(names_from = "unique", values_from = "N") %>%
+  kable(
+    format.args = list(big.mark = ","),
+    caption = "Number of fuzzy and unique species."
+  )
+```
+
+## Misspelling
+
+```{r fuzzy_dist}
+#| message: false
+#| warning: false
+read_tsv("../species/data/derived_data/wfo_out_v2.tsv") %>%
+  filter(Matched, Fuzzy) %>%
+  group_by(spec.name) %>%
+  summarise(fuzzy_dist = unique(Fuzzy.dist)) %>%
+  group_by(fuzzy_dist) %>%
+  summarise(N = n()) %>%
+  kable(caption = "Number of misspelled species by the number of misspelled letters.") # nolint
+```
+
+## Synonymy
+
+::: {style="font-size: 50%;"}
+```{r exact_multiple}
+#| message: false
+#| warning: false
+read_tsv("../species/data/derived_data/wfo_out_v2.tsv") %>%
+  filter(Matched, !Fuzzy, !Unique, New.accepted) %>%
+  select(spec.name, scientificName) %>%
+  unique() %>%
+  group_by(spec.name) %>%
+  filter(n() > 1) %>%
+  summarise(scientificName = paste0(scientificName, collapse = ", ")) %>%
+  kable(caption = "Exact match with multiple newly accepted names.")
+```
+:::
+
+## Process
+
+1.  Using closest correct spelling
+2.  Accepting single exact matches
+3.  Accepting single newly accepted names for multiple matches
+4.  Accepting the first newly accepted names for multiple matches in case of multiples (to be changed later)
+5.  Using manual curation for species not matched
+
+## Result
+
+Number of synonymy, misspelling, and update corrections per taxonomic level for a final total of 2,060 species.
+
+```{r wfo_clean_stat}
+#| message: false
+clean <- read_tsv("../species/outputs/taxonomy_v2.tsv")
+fam_cor <- select(clean, family_corrected, family_cleaned) %>%
+  unique() %>%
+  na.omit() %>%
+  filter(family_corrected != family_cleaned)
+gen_cor <- select(clean, genus_corrected, genus_cleaned) %>%
+  unique() %>%
+  na.omit() %>%
+  filter(genus_corrected != genus_cleaned)
+sp_cor <- select(clean, species_corrected, species_cleaned) %>%
+  unique() %>%
+  na.omit() %>%
+  filter(species_corrected != species_cleaned)
+data.frame(
+  level = c("family", "genus", "species"),
+  N = c(nrow(fam_cor), nrow(gen_cor), nrow(sp_cor))
+) %>%
+  kable() # nolint
+```
+
+# Phylogeny
+
+Phylogenetic tree using the backbone phylogeny of two recently published mega-trees [@smith2018] [@zanne2013] using the `V.PhyloMaker` [@jin2019].
+
+## All
+
+```{r phyloall}
+#| fig-width: 12
+#| fig-height: 6
+#| message: false
+#| warning: false
+#| fig-cap: "Global phylogeny of species across all sites."
+splist <- read_tsv("../species/outputs/taxonomy_v2.tsv") %>%
+  select(species_cleaned, genus_cleaned, family_cleaned) %>%
+  na.omit() %>%
+  unique() %>%
+  rename_all(~ gsub("_cleaned", "", .)) %>%
+  mutate(species = paste(genus, species))
+phylo <- ape::read.tree("../species/outputs/phylogeny_v2.tree")
+phylo_df <- phylo4d(
+  phylo,
+  data.frame(species = gsub("_", " ", phylo$tip.label)) %>%
+    left_join(splist)
+)
+ggtree(phylo_df, aes(col = family), layout = "circular") +
+  theme_tree(legend.text = element_text(face = "italic", size = 6)) +
+  scale_color_discrete("")
+```
+
+## Misiones
+
+```{r phylomisiones}
+#| message: false
+#| warning: false
+#| fig-cap: "Global phylogeny of species with Misiones species in green."
+taxo <- read_tsv("../species/outputs/taxonomy_v2.tsv") %>%
+  filter(site == "Misiones") %>%
+  select(species_cleaned, genus_cleaned, family_cleaned) %>%
+  na.omit() %>%
+  unique() %>%
+  rename_all(~ gsub("_cleaned", "", .)) %>%
+  mutate(species = paste(genus, species))
+phylo_df@data$site <- phylo_df@data$species %in% taxo$species
+ggtree(phylo_df, aes(col = site, alpha = site), layout = "circular") +
+  scale_color_manual(
+    guide = "none",
+    values = c("grey", "darkgreen", "grey")
+  ) +
+  scale_alpha_manual(
+    guide = "none",
+    values = c(.1, 1, .1)
+  )
+```
+
+# Functional
+
+Functional trait data from TRY [@10.1111/gcb.14904], BIOMASS [@10.1111/2041-210x.12753], and TALLO [@10.1111/gcb.16302] and their imputation using predictive mean matching in `mice` [@10.18637/jss.v045.i03].
+
+## BIOMASS WD
+
+## TRY Coverage
+
+## TRY WD
+
+## TRY SLA
+
+## TRY LA
+
+## TRY N
+
+## TALLO data
+
+## TALLO model
+
+## TALLO sites
+
+## TALLO hmax
+
+## Correlations
+
+## Count
+
+## Imputation
+
+## Imputation site
 
 # References
 
