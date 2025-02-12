@@ -820,33 +820,338 @@ ggtree(phylo_df, aes(col = site, alpha = site), layout = "circular") +
 
 Functional trait data from TRY [@10.1111/gcb.14904], BIOMASS [@10.1111/2041-210x.12753], and TALLO [@10.1111/gcb.16302] and their imputation using predictive mean matching in `mice` [@10.18637/jss.v045.i03].
 
-## BIOMASS WD
-
 ## TRY Coverage
+
+```{r try_sp_traits}
+#| message: false
+#| warning: false
+#| fig-cap: "Traits available for at least 50% of species available on TRY."
+list.files("../species/data/derived_data/try_req/", full.names = TRUE) %>%
+  lapply(read_tsv, skip = 3) %>%
+  lapply(gather, species, N, -Trait, -TraitID) %>%
+  bind_rows() %>%
+  filter(N > 0) %>%
+  group_by(Trait, TraitID) %>%
+  summarise(N = n()) %>%
+  filter(N > 0.4 * 1901) %>%
+  ggplot(aes(fct_rev(fct_infreq(Trait, N)), N)) +
+  geom_point() +
+  coord_flip() +
+  dark_theme_gray() +
+  theme(
+    plot.background = element_rect(fill = "grey10", color = NA),
+    axis.title = element_blank()
+  )
+```
 
 ## TRY WD
 
+```{r trywd}
+#| message: false
+#| warning: false
+#| fig-cap: "Wood density extracted from @kattge2019."
+traits <- read_tsv("../species/outputs/traits_v2.tsv") %>%
+  select(scientific_cleaned, trait, trait_value_raw) %>%
+  pivot_wider(names_from = trait, values_from = trait_value_raw)
+taxo <- read_tsv("../species/outputs/taxonomy_v2.tsv") %>%
+  select(site, scientific_cleaned) %>%
+  na.omit() %>%
+  left_join(traits)
+g1 <- ggplot(taxo, aes(WD, col = site)) +
+  geom_density() +
+  xlab(expression("Wood Density [" ~ g / cm^3 ~ "]")) +
+  dark_theme_gray() +
+  theme(
+    plot.background = element_rect(fill = "grey10", color = NA),
+    legend.background = element_rect(fill = "grey10", color = NA),
+    legend.key.size = unit(0.01, "npc")
+  )
+g2 <- ggplot(taxo, aes(site, WD, col = site)) +
+  geom_violin() +
+  geom_boxplot(width = .2) +
+  coord_flip() +
+  ylab(expression("Wood Density [" ~ g / cm^3 ~ "]")) +
+  dark_theme_gray() +
+  theme(
+    plot.background = element_rect(fill = "grey10", color = NA),
+    legend.position = "none",
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+cowplot::plot_grid(g1, g2, nrow = 2)
+```
+
 ## TRY SLA
+
+```{r trysla}
+#| message: false
+#| warning: false
+#| fig-cap: "Specific leaf area extracted from @kattge2019."
+g1 <- ggplot(taxo, aes(SLA, col = site)) +
+  geom_density() +
+  scale_x_log10() +
+  xlab(expression("Specific Leaf Area [" ~ mm^2 ~ mg^{
+    -1
+  } ~ "]")) +
+  dark_theme_gray() +
+  theme(
+    plot.background = element_rect(fill = "grey10", color = NA),
+    legend.background = element_rect(fill = "grey10", color = NA),
+    legend.key.size = unit(0.01, "npc")
+  )
+g2 <- ggplot(taxo, aes(site, SLA, col = site)) +
+  geom_violin() +
+  geom_boxplot(width = .2) +
+  coord_flip() +
+  scale_y_log10() +
+  ylab(expression("Specific Leaf Area [" ~ mm^2 ~ mg^{
+    -1
+  } ~ "]")) +
+  dark_theme_gray() +
+  theme(
+    plot.background = element_rect(fill = "grey10", color = NA),
+    legend.position = "none",
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+cowplot::plot_grid(g1, g2, nrow = 2)
+```
 
 ## TRY LA
 
+```{r tryla}
+#| message: false
+#| warning: false
+#| fig-cap: "Leaf area extracted from @kattge2019."
+g1 <- ggplot(taxo, aes(LA, col = site)) +
+  geom_density() +
+  xlab(expression("Leaf Area [" ~ mm^2 ~ "]")) +
+  dark_theme_gray() +
+  theme(
+    plot.background = element_rect(fill = "grey10", color = NA),
+    legend.background = element_rect(fill = "grey10", color = NA),
+    legend.key.size = unit(0.01, "npc")
+  )
+g2 <- ggplot(taxo, aes(site, LA, col = site)) +
+  geom_violin() +
+  geom_boxplot(width = .2) +
+  coord_flip() +
+  ylab(expression("Leaf Area [" ~ mm^2 ~ "]")) +
+  dark_theme_gray() +
+  theme(
+    plot.background = element_rect(fill = "grey10", color = NA),
+    legend.position = "none",
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+cowplot::plot_grid(g1, g2, nrow = 2)
+```
+
 ## TRY N
+
+```{r tryn}
+#| message: false
+#| warning: false
+#| fig-cap: "Leaf nitrogen extracted from @kattge2019."
+g1 <- ggplot(taxo, aes(N, col = site)) +
+  geom_density() +
+  xlab(expression("Nitrogen [" ~ mg / g ~ "]")) +
+  dark_theme_gray() +
+  theme(
+    plot.background = element_rect(fill = "grey10", color = NA),
+    legend.background = element_rect(fill = "grey10", color = NA),
+    legend.key.size = unit(0.01, "npc")
+  )
+g2 <- ggplot(taxo, aes(site, N, col = site)) +
+  geom_violin() +
+  geom_boxplot(width = .2) +
+  coord_flip() +
+  ylab(expression("Nitrogen [" ~ mg / g ~ "]")) +
+  dark_theme_gray() +
+  theme(
+    plot.background = element_rect(fill = "grey10", color = NA),
+    legend.position = "none",
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+cowplot::plot_grid(g1, g2, nrow = 2)
+```
 
 ## TALLO data
 
+```{r tallo}
+#| warning: false
+#| message: false
+#| fig-cap: "Height-diameter relation for species of our datasets in TALLO."
+tallo <- read_tsv("../species/outputs/taxonomy_v2.tsv") %>%
+  select(scientific_cleaned) %>%
+  na.omit() %>%
+  unique() %>%
+  left_join(read_csv("../species/data/raw_data/Tallo.csv?download=1"),
+    by = c("scientific_cleaned" = "species")
+  ) %>%
+  filter(!is.na(tree_id))
+tallo %>%
+  ggplot(aes(stem_diameter_cm, height_m)) +
+  geom_point(aes(col = scientific_cleaned), alpha = 0.25) +
+  geom_smooth(formula = y ~ log(x)) +
+  scale_color_discrete(guide = "none") +
+  xlab("diameter (cm)") +
+  ylab("height (m)") +
+  ggtitle("TALLO", paste(length(unique(tallo$scientific_cleaned)), "species")) +
+  dark_theme_gray() +
+  theme(
+    plot.background = element_rect(fill = "grey10", color = NA)
+  )
+```
+
 ## TALLO model
+
+$$
+\begin{array}{c} 
+log(height) \sim N [ log(h_{max,s} \times \frac{dbh}{a_{h,s}+dbh^2}), \sigma^2] \\
+h_{max,s} \sim N (h_{max}, \sigma_h^2) \\
+a_{h,s} \sim N (a_{h}, \sigma_a^2)
+\end{array}
+$$
 
 ## TALLO sites
 
+```{r ahhmax}
+#| message: false
+#| warning: false
+#| fig-cap: "Inferred species allometric parameters hmax and ah and their relations per site." #nolint
+read_tsv("../species/outputs/taxonomy_v2.tsv") %>%
+  left_join(read_tsv("../species/data/derived_data/tallo_pars.tsv")) %>%
+  filter(!is.na(ah)) %>%
+  ggplot(aes(ah, hmax)) +
+  geom_point() +
+  facet_wrap(~site) +
+  xlab(expression(a[h])) +
+  ylab(expression(h[max])) +
+  dark_theme_gray() +
+  theme(
+    plot.background = element_rect(fill = "grey10", color = NA)
+  )
+```
+
 ## TALLO hmax
+
+```{r hmaxsite}
+#| message: false
+#| warning: false
+#| fig-cap: "Inferred species allometric parameters hmax per site."
+g1 <- ggplot(taxo, aes(hmax, col = site)) +
+  geom_density() +
+  xlab(expression(h[max] ~ "[" ~ m ~ "]")) +
+  dark_theme_gray() +
+  theme(
+    plot.background = element_rect(fill = "grey10", color = NA),
+    legend.background = element_rect(fill = "grey10", color = NA),
+    legend.key.size = unit(0.01, "npc")
+  )
+g2 <- ggplot(taxo, aes(site, hmax, col = site)) +
+  geom_violin() +
+  geom_boxplot(width = .2) +
+  coord_flip() +
+  ylab(expression(h[max] ~ "[" ~ m ~ "]")) +
+  dark_theme_gray() +
+  theme(
+    plot.background = element_rect(fill = "grey10", color = NA),
+    legend.position = "none",
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+cowplot::plot_grid(g1, g2, nrow = 2)
+```
 
 ## Correlations
 
-## Count
+```{r all_traits}
+#| warning: false
+#| message: false
+#| fig-cap: Species traits pairwise correlations.
+par(bg = "grey10")
+taxo %>%
+  select(WD, hmax, SLA, LA, N) %>%
+  cor(use = "pairwise.complete.obs") %>%
+  corrplot::corrplot(
+    type = "upper", diag = FALSE,
+    bg = "grey10", tl.col = "white"
+  )
+```
+
+## Count {.smaller}
+
+::: {style="font-size: 60%;"}
+```{r traitcount}
+taxo %>%
+  gather(trait, value, -site, -scientific_cleaned) %>%
+  na.omit() %>%
+  group_by(site, trait) %>%
+  summarise(n = n()) %>%
+  pivot_wider(names_from = trait, values_from = n) %>%
+  kable()
+```
+:::
 
 ## Imputation
 
+```{r pcatraits}
+#| message: false
+#| warning: false
+#| fig-cap: Imputed traits global principal component analysis.
+imputed <- read_tsv("../species/data/derived_data/imputed_traits.tsv")
+autoplot(
+  princomp(select(imputed, wd, hmax, sla, la, n) %>%
+             mutate(sla = log(sla), la = log(la)), cor = TRUE),
+  data = imputed, alpha = 0.25, col = "lightgrey",
+  loadings.label.size = 6,
+  loadings.label.colour = "red", loadings.label.vjust = 1.1,
+  loadings.label.repel = TRUE,
+  loadings = TRUE, loadings.label = TRUE, loadings.colour = "red"
+) +
+  geom_hline(aes(yintercept = 0), col = "black", linetype = "dotted") +
+  geom_vline(aes(xintercept = 0), col = "black", linetype = "dotted") +
+  geom_density_2d_filled(alpha = .5) +
+  dark_theme_gray() +
+  theme(
+    plot.background = element_rect(fill = "grey10", color = NA),
+    legend.background = element_rect(fill = "grey10", color = NA),
+    legend.position = "none"
+  )
+```
+
 ## Imputation site
+
+```{r pcasite}
+#| message: false
+#| warning: false
+#| fig-cap: Imputed traits global principal component analysis per site.
+traits <- read_tsv("../species/outputs/traits_v2.tsv") %>%
+  select(scientific_cleaned, trait, trait_value_imputed) %>%
+  pivot_wider(names_from = trait, values_from = trait_value_imputed)
+taxo <- read_tsv("../species/outputs/taxonomy_v2.tsv") %>%
+  select(site, scientific_cleaned) %>%
+  na.omit() %>%
+  left_join(traits)
+autoplot(
+  princomp(select(taxo, WD, hmax, SLA, LA, N) %>%
+             mutate(sla = log(SLA), la = log(LA)), cor = TRUE),
+  data = taxo, alpha = 0.25
+) +
+  geom_hline(aes(yintercept = 0), col = "black", linetype = "dotted") +
+  geom_vline(aes(xintercept = 0), col = "black", linetype = "dotted") +
+  facet_wrap(~site) +
+  geom_density_2d_filled(alpha = .5) +
+  theme(legend.position = "none") +
+  dark_theme_gray() +
+  theme(
+    plot.background = element_rect(fill = "grey10", color = NA),
+    legend.background = element_rect(fill = "grey10", color = NA),
+    legend.position = "none"
+  )
+```
 
 # References
 

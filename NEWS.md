@@ -1,2 +1,3 @@
+-   envsp_meeting 0.1.0.9003: v1 ready
 -   envsp_meeting 0.1.0.9002: all sp except functional
 -   envsp_meeting 0.1.0.9001: env pres
