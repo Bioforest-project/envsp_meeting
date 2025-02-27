@@ -86,7 +86,7 @@ read_tsv("../environment/data/derived_data/sites.tsv") %>%
 
 # Climate
 
-[TerraClimate](https://www.climatologylab.org/terraclimate.html) is a dataset of **monthly** & **\~4-km (1/24th degree**)climate and climatic **water balance** for global terrestrial surfaces from **1958-2019** [@abatzoglou2018]. We have information per depth in each plot as shown below, but I focuses on the top horizon (up to 5cm).
+[TerraClimate](https://www.climatologylab.org/terraclimate.html) is a dataset of **monthly** & **\~4-km (1/24th degree**)climate and climatic **water balance** for global terrestrial surfaces from **1958-2019** [@abatzoglou2018].
 
 ## Monthly variables
 
@@ -111,7 +111,7 @@ read_tsv("../environment/data/derived_data/climate_month.tsv") %>%
   group_by(site, month) %>%
   summarise_all(mean) %>%
   ggplot(aes(x = month)) +
-  geom_col(aes(y = pr / 10, fill = pr < 100), col = NA) +
+  geom_col(aes(y = pr / 10, fill = pr <= 100), col = NA) +
   geom_line(aes(y = tmmn, col = "maximum"), linewidth = 1.1) +
   geom_line(aes(y = tmmx, col = "minimum"), linewidth = 1.1) +
   xlab("") +
@@ -123,7 +123,7 @@ read_tsv("../environment/data/derived_data/climate_month.tsv") %>%
     name = "Temperature (°C)",
     sec.axis = sec_axis(trans = ~ . * 10, name = "Precipitation (mm)")
   ) +
-  scale_color_discrete(guide = "none") +
+  scale_color_manual(guide = "none", values = c("#5a6bff", "#ff5a5a")) +
   facet_wrap(~site) +
   scale_fill_manual(guide = "none", values = c("darkgrey", "white")) +
   dark_theme_gray() +
@@ -153,7 +153,7 @@ read_tsv("../environment/data/derived_data/climate_month.tsv") %>%
     name = "Temperature (°C)",
     sec.axis = sec_axis(trans = ~ . * 10, name = "Precipitation (mm)")
   ) +
-  scale_color_discrete(guide = "none") +
+  scale_color_manual(guide = "none", values = c("#5a6bff", "#ff5a5a")) +
   facet_wrap(~site) +
   scale_fill_manual(guide = "none", values = c("darkgrey", "white")) +
   dark_theme_gray() +
@@ -298,7 +298,7 @@ read_tsv("../environment/data/derived_data/soil.tsv") %>%
 ```{r allplot5}
 #| message: false
 #| warning: false
-#| fig-cap: "Mean soil data per site for top horizon (up to 5cm)."
+#| fig-cap: "Mean soil data per site for top horizon (up to 15cm)."
 read_tsv("../environment/data/derived_data/soil.tsv") %>%
   select(-X, -Y, -plot) %>%
   group_by(site) %>%
@@ -818,7 +818,7 @@ ggtree(phylo_df, aes(col = site, alpha = site), layout = "circular") +
 
 # Functional
 
-Functional trait data from TRY [@10.1111/gcb.14904], BIOMASS [@10.1111/2041-210x.12753], and TALLO [@10.1111/gcb.16302] and their imputation using predictive mean matching in `mice` [@10.18637/jss.v045.i03].
+Functional trait data from TRY [@kattge2019] and TALLO [@jucker2022] and their imputation using predictive mean matching.
 
 ## TRY Coverage
 
@@ -1088,6 +1088,8 @@ taxo %>%
 taxo %>%
   gather(trait, value, -site, -scientific_cleaned) %>%
   na.omit() %>%
+  group_by(site, trait, scientific_cleaned) %>%
+  summarise(mean = mean(value)) %>%
   group_by(site, trait) %>%
   summarise(n = n()) %>%
   pivot_wider(names_from = trait, values_from = n) %>%
